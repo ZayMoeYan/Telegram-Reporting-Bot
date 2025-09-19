@@ -1,0 +1,7 @@
+gradio>=4.44.0
+pandas>=2.1.0
+google-genai>=0.4.0
+python-dotenv>=1.0.1
+python-telegram-bot>=20.0
+openpyxl>=3.1.0   # for .xlsx Excel files
+xlrd>=2.0.1       # for .xls Excel files
