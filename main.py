@@ -206,7 +206,7 @@ def generate_options(file_path: str, dataset_type: str,  show_suggestions=False,
  
     fallback = DATASET_OPTIONS.get(dataset_type, DATASET_OPTIONS["unknown"])
     keyboard = [[InlineKeyboardButton(opt, callback_data=opt) for opt in row] for row in fallback]
-    
+
     if show_suggestions:
         if last_button_text:
             keyboard.append([
@@ -391,11 +391,7 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_path, dataset_type, show_suggestions=True, last_button_text=button_text
     )
 
-    
-    markup = generate_options(file_path, dataset_type, show_suggestions=True)
-    # if not user_suggestions_shown.get(user_id, False):
-    #     markup = generate_options(file_path, dataset_type, show_suggestions=True)
-    #     user_suggestions_shown[user_id] = True
+    markup = generate_options(file_path, dataset_type, show_suggestions=True, last_button_text=button_text)
 
 
     if len(last_reply) <= MAX_TELEGRAM_MESSAGE:
@@ -420,6 +416,7 @@ async def handle_suggestions(update: Update, context: ContextTypes.DEFAULT_TYPE)
     last_report = user_last_report.get(user_id)
     last_options = user_last_options.get(user_id)
     button_text = context.user_data.get("last_button_text", "the selected report")  # Retrieve last option
+   
 
     if not last_report or not last_options:
         await query.message.reply_text("⚠️ No previous report found to base suggestions on.")
@@ -460,13 +457,15 @@ async def handle_suggestions(update: Update, context: ContextTypes.DEFAULT_TYPE)
         formatted_lines.append(line)
     formatted_text = "\n".join(formatted_lines)
 
+    markup = generate_options(file_path=None, dataset_type=user_dataset_types[user_id], show_suggestions=True, last_button_text=button_text)
+
     # Final wrapped message
     final_suggestions = f"📌 *Suggestions about {button_text}:*\n\n{formatted_text}"
 
     await query.message.reply_text(
         final_suggestions, 
         parse_mode="Markdown", 
-        reply_markup=generate_options(file_path=None, dataset_type=user_dataset_types[user_id], show_suggestions=True)
+        reply_markup=markup
     )
 
 
