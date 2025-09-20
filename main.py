@@ -138,7 +138,8 @@ def get_bot_response(history, file):
         nlg_prompt = f"""
         The user asked: "{message}". Based on the uploaded CSV,
         The computed answer is: {repr(answer)}.
-        Summarize the result in 5-10 sentences.
+        Summarize the result in 10-20 sentences.
+        (use bullet points if needed. use tables if needed. use lists if needed.)
         Reply in a clear, professional tone, style. 
         Dont't use Hello,Hi, or Greetings. Don't mention the dataframe name. 
         Dont't mention code. Dont't say "as an AI model".
@@ -189,10 +190,10 @@ DATASET_OPTIONS = {
         ["Sales by Product Category Report", "Tax Report"]
     ],
     "inventory_data": [
-        ["Stock Levels", "Low Inventory"],
-        ["Restock Dates", "Warehouse Summary"],
-        ["Fast Movers", "Slow Movers"],
-        ["Out of Stock", "Category Breakdown"]
+        ["Stock Status Report", "Reorder Report"],
+        ["Inventory Valuation Report", "Inventory Aging Report"],
+        ["Inventory by Category Report", "Supplier Performance Report"],
+        ["Customer Order Report", "Inventory Level Summary Report"]
     ],
     "unknown": [
         ["Show Columns", "Basic Stats"],
