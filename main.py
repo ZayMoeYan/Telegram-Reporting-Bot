@@ -223,6 +223,18 @@ def generate_options(file_path: str, dataset_type: str,  show_suggestions=False,
 # Telegram Handlers
 # -------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+    user_id = update.effective_chat.id
+
+    user_files.pop(user_id, None)
+    user_histories.pop(user_id, None)
+    user_dataset_types.pop(user_id, None)
+    user_suggestions_shown.pop(user_id, None)
+    user_last_report.pop(user_id, None)
+    user_last_options.pop(user_id, None)
+    context.user_data.clear()
+
+
     keyboard = [
         [InlineKeyboardButton("📊 Sales Data", callback_data="choose_sales")],
         [InlineKeyboardButton("👥 Employee Data", callback_data="choose_employee")],
