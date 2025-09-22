@@ -62,12 +62,6 @@ def add_user_message(message, history):
 
 def get_bot_response(history, file):
     message = history[-1]['content']
-
-    # if file is None:
-    #     intro_message = "📂 Now please upload your CSV file by tapping the 📎 icon below and selecting ‘File’.",
-    #     history.append({"role": "assistant", "content": intro_message})
-    #     return history
-
     df = load_dataframe(file)
 
     try:
@@ -123,10 +117,14 @@ def get_bot_response(history, file):
     try:
         exec(generated_code, {"df": df, "pd": pd}, local_vars)
         answer = local_vars.get("ANSWER")
-        if isinstance(answer, (pd.Series, pd.DataFrame)):
-            answer = clean_pandas_output(answer)
+
+        # if isinstance(answer, (pd.Series, pd.DataFrame)):
+        #     answer = clean_pandas_output(answer)
+
     except Exception:
         answer = None
+    
+    print(answer)
 
     if answer is None:
         nlg_prompt = f"""
@@ -138,18 +136,30 @@ def get_bot_response(history, file):
         nlg_prompt = f"""
         The user asked: "{message}". Based on the uploaded CSV,
         The computed answer is: {repr(answer)}.
-        Summarize the result in 10-20 sentences.
-        (use bullet points if needed. use tables if needed. use lists if needed.)
-        Reply in a clear, professional tone, style. 
-        Dont't use Hello,Hi, or Greetings. Don't mention the dataframe name. 
-        Dont't mention code. Dont't say "as an AI model".
-        Dont't repeat the question. Dont't apologize. Dont't say "the answer is". Dont't use hastags and emojis.
+
+        Summarize the result in 10–15 sentences.
+
+        - You must explicitly use the 'Year' and 'Month' columns from the dataset when describing results.
+        - Always write time references as exact dates (e.g., "March 2022", "2023") instead of generic phrases like "first period."
+        - If both Year and Month are present, combine them into a single label like "March 2023."
+        - Use bullet points, numbered lists, or tables where appropriate.
+        - Highlight chronological changes clearly across years/months.
+        - Maintain a clear, professional tone.
+
+        Do not:
+        - Start with greetings like "Hello" or "Hi."
+        - Mention the dataframe name or any code.
+        - Repeat the user’s question.
+        - Use filler phrases such as "the answer is," "as an AI model," or apologies.
+        - Add hashtags or emojis.
         """
+
     nlg_resp = client.models.generate_content(
         model="gemini-2.5-flash", contents=nlg_prompt
     )
     history.append({"role": "assistant", "content": nlg_resp.text.strip()})
     return history
+
 
 def classify_dataset(file_path: str) -> str:
     df = load_dataframe(file_path)
@@ -164,6 +174,7 @@ def classify_dataset(file_path: str) -> str:
     - employee_data (HR/people info)
     - sales_data (transactions, revenue, customers)
     - inventory_data (products, stock, warehouses)
+    - finance_data (revenue, expenses, departments, netincome)
     Answer with ONLY one of: employee_data, sales_data, inventory_data, unknown.
     """
     resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
@@ -174,11 +185,13 @@ def classify_dataset(file_path: str) -> str:
         return "sales_data"
     elif "inventory" in answer:
         return "inventory_data"
+    elif "finance" in answer:
+        return "finance_data"
     return "unknown"
 
 DATASET_OPTIONS = {
     "employee_data": [
-        ["Employee Demographics Report", "Salary by Role"],
+        ["Employee Demographics Report", "Salary by Role Report"],
         ["Employee Tenure Report", "Headcount Report"],
         ["Salary Distribution Report", "New Hires Report"],
         ["Employee Attrition Report", "Employee Compensation Report"]
@@ -194,6 +207,12 @@ DATASET_OPTIONS = {
         ["Inventory Valuation Report", "Inventory Aging Report"],
         ["Inventory by Category Report", "Supplier Performance Report"],
         ["Customer Order Report", "Inventory Level Summary Report"]
+    ],
+    "finance_data": [
+        ["Monthly Financial Performance Report", "Departmental Profitability Report"],
+        ["Yearly Financial Report", "Revenue by Department Report"],
+        ["Expense by Department Report", "Operational Efficiency Report"],
+        ["Tax Report", "Net Income Trend Report"]
     ],
     "unknown": [
         ["Show Columns", "Basic Stats"],
@@ -223,22 +242,11 @@ def generate_options(file_path: str, dataset_type: str,  show_suggestions=False,
 # Telegram Handlers
 # -------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    
-    user_id = update.effective_chat.id
-
-    user_files.pop(user_id, None)
-    user_histories.pop(user_id, None)
-    user_dataset_types.pop(user_id, None)
-    user_suggestions_shown.pop(user_id, None)
-    user_last_report.pop(user_id, None)
-    user_last_options.pop(user_id, None)
-    context.user_data.clear()
-
-
     keyboard = [
         [InlineKeyboardButton("📊 Sales Data", callback_data="choose_sales")],
         [InlineKeyboardButton("👥 Employee Data", callback_data="choose_employee")],
-        [InlineKeyboardButton("📦 Inventory Data", callback_data="choose_inventory")]
+        [InlineKeyboardButton("📦 Inventory Data", callback_data="choose_inventory")],
+        [InlineKeyboardButton("📈 Finance Data", callback_data="choose_finance")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -276,7 +284,8 @@ async def handle_dataset_choice(update: Update, context: ContextTypes.DEFAULT_TY
     dataset_type_map = {
         "choose_sales": "sales_data",
         "choose_employee": "employee_data",
-        "choose_inventory": "inventory_data"
+        "choose_inventory": "inventory_data",
+        "choose_finance": "finance_data"
     }
 
     dataset_type = dataset_type_map.get(choice, "unknown")
@@ -302,7 +311,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if selected_type is None:
         await update.effective_message.reply_text(
-            "⚠️ Please select a dataset type first (📊 Sales, 👥 Employee, 📦 Inventory) "
+            "⚠️ Please select a dataset type first (📊 Sales, 👥 Employee, 📦 Inventory, 📈 Finance) "
             "before uploading a file."
         )
         return
@@ -443,14 +452,14 @@ async def handle_suggestions(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     suggestion_prompt = f"""
-    You are a business/data analyst. Based on the following report:
-    {last_report}
+        You are a business/data analyst. Based on the following report:
+        {last_report}
 
-    Provide 5 concise, actionable suggestions and recommendations for the user about {button_text}.
-    Format them clearly as bullet points (using "-" at the start of each line).
-    Keep it professional and easy to read. 
-    Don't repeat the report, don't apologize, don't mention code or dataframes. 
-    Don't use greetings, hashtags, or emojis.
+        Provide 5 concise, actionable suggestions and recommendations for the user about {button_text}.
+        Format them clearly as bullet points (using "-" at the start of each line).
+        Keep it professional and easy to read. 
+        Don't repeat the report, don't apologize, don't mention code or dataframes. 
+        Don't use greetings, hashtags, or emojis.
     """
 
     suggestion_resp = client.models.generate_content(
@@ -496,7 +505,8 @@ async def handle_upload_new_file(update: Update, context: ContextTypes.DEFAULT_T
     keyboard = [
         [InlineKeyboardButton("📊 Sales Data", callback_data="choose_sales")],
         [InlineKeyboardButton("👥 Employee Data", callback_data="choose_employee")],
-        [InlineKeyboardButton("📦 Inventory Data", callback_data="choose_inventory")]
+        [InlineKeyboardButton("📦 Inventory Data", callback_data="choose_inventory")],
+        [InlineKeyboardButton("📈 Finance Data", callback_data="choose_finance")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
