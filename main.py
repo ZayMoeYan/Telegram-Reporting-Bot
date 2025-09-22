@@ -124,8 +124,6 @@ def get_bot_response(history, file):
     except Exception:
         answer = None
     
-    print(answer)
-
     if answer is None:
         nlg_prompt = f"""
         The user asked: "{message}".
@@ -137,7 +135,7 @@ def get_bot_response(history, file):
         The user asked: "{message}". Based on the uploaded CSV,
         The computed answer is: {repr(answer)}.
 
-        Summarize the result in 10–15 sentences.
+        Summarize the result in 10–20 sentences.
 
         - You must explicitly use the 'Year' and 'Month' columns from the dataset when describing results.
         - Always write time references as exact dates (e.g., "March 2022", "2023") instead of generic phrases like "first period."
